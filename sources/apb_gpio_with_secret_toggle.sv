@@ -15,89 +15,98 @@ module apb_gpio_with_secret_toggle (
 
     localparam ADDR_GPIO = 4'h0;
 
-    // Gate transfers with PRE-READY so each APB write is seen exactly once.
-    logic apb_transfer;
+    // APB handshaking
     logic apb_write;
     logic apb_read;
     logic gpio_sel;
 
-    assign apb_transfer = psel & penable & pready;
-    assign apb_write    = apb_transfer & pwrite;
-    assign apb_read     = apb_transfer & ~pwrite;
-    assign gpio_sel     = (paddr[3:0] == ADDR_GPIO);
+    assign gpio_sel = (paddr[3:0] == ADDR_GPIO);
 
-    // Simple APB slave: drive ready high after reset.
+    // Simple APB slave: ready after reset
     always_ff @(posedge pclk or negedge presetn) begin
-        if (!presetn) begin
+        if (!presetn)
             pready <= 1'b0;
-        end else begin
+        else
             pready <= 1'b1;
-        end
     end
 
-    // GPIO register and secret pin flop.
-    logic [7:0] gpio_reg;
-    logic       secret_pin_r;
-    assign secret_pin = secret_pin_r;
+    // Detect valid APB transactions (only when ready is high)
+    assign apb_write = psel & penable & pready & pwrite & gpio_sel;
+    assign apb_read  = psel & penable & pready & ~pwrite & gpio_sel;
 
-    // Track elapsed cycles since the most recent GPIO write.
-    logic [3:0] cycles_since_write;  // allows “>= 3 clocks between writes”
+    // GPIO register
+    logic [7:0] gpio_reg;
+
+    // Secret pin and sequence detection
+    logic secret_pin_r;
+    assign secret_pin = secret_pin_r;
 
     typedef enum logic [1:0] {
         S_IDLE,
         S_WAIT_AA,
         S_WAIT_5A
-    } seq_state_e;
+    } state_t;
 
-    seq_state_e seq_state;
+    state_t state;
+    logic [3:0] idle_count;  // Count idle cycles between writes
 
     always_ff @(posedge pclk or negedge presetn) begin
         if (!presetn) begin
-            gpio_reg            <= 8'd0;
-            prdata              <= 32'd0;
-            secret_pin_r        <= 1'b0;
-            seq_state           <= S_IDLE;
-            cycles_since_write  <= 4'd0;
+            gpio_reg     <= 8'd0;
+            prdata       <= 32'd0;
+            secret_pin_r <= 1'b0;
+            state        <= S_IDLE;
+            idle_count   <= 4'd0;
         end else begin
-            // Default: increment cycle counter while sequence is active.
-            if (seq_state != S_IDLE && cycles_since_write != 4'hF) begin
-                cycles_since_write <= cycles_since_write + 1'b1;
+            // Default: increment idle counter
+            if (state != S_IDLE && idle_count != 4'hF)
+                idle_count <= idle_count + 1'b1;
+
+            // Handle reads
+            if (apb_read) begin
+                prdata     <= {24'd0, gpio_reg};
+                state      <= S_IDLE;  // Read aborts sequence
+                idle_count <= 4'd0;
             end
 
-            // Handle APB reads.
-            if (apb_read && gpio_sel) begin
-                prdata             <= {24'd0, gpio_reg};
-                seq_state          <= S_IDLE;          // any read aborts sequence
-                cycles_since_write <= 4'd0;
-            end
+            // Handle writes
+            if (apb_write) begin
+                gpio_reg <= pwdata[7:0];
 
-            // Handle APB writes.
-            if (apb_write && gpio_sel) begin
-                gpio_reg            <= pwdata[7:0];
-                cycles_since_write  <= 4'd0;           // reset counter on every write
-
-                unique case (seq_state)
+                case (state)
                     S_IDLE: begin
                         if (pwdata[7:0] == 8'h55) begin
-                            seq_state <= S_WAIT_AA;
+                            state      <= S_WAIT_AA;
+                            idle_count <= 4'd0;
                         end
                     end
 
                     S_WAIT_AA: begin
-                        if (pwdata[7:0] == 8'hAA && cycles_since_write >= 4'd3) begin
-                            seq_state <= S_WAIT_5A;
-                        end else if (pwdata[7:0] != 8'hAA) begin
-                            seq_state <= S_IDLE;
+                        // Check if enough time passed (idle_count incremented this cycle, so it's already +1)
+                        if (pwdata[7:0] == 8'hAA && idle_count >= 4'd3) begin
+                            state      <= S_WAIT_5A;
+                            idle_count <= 4'd0;
+                        end else begin
+                            // Wrong value or wrong timing
+                            state      <= S_IDLE;
+                            idle_count <= 4'd0;
                         end
                     end
 
                     S_WAIT_5A: begin
-                        if (pwdata[7:0] == 8'h5A && cycles_since_write >= 4'd3) begin
-                            secret_pin_r <= ~secret_pin_r;  // success!
-                            seq_state    <= S_IDLE;
-                        end else if (pwdata[7:0] != 8'h5A) begin
-                            seq_state <= S_IDLE;
+                        if (pwdata[7:0] == 8'h5A && idle_count >= 4'd3) begin
+                            secret_pin_r <= ~secret_pin_r;  // Toggle!
+                            state        <= S_IDLE;
+                            idle_count   <= 4'd0;
+                        end else begin
+                            state      <= S_IDLE;
+                            idle_count <= 4'd0;
                         end
+                    end
+
+                    default: begin
+                        state      <= S_IDLE;
+                        idle_count <= 4'd0;
                     end
                 endcase
             end
