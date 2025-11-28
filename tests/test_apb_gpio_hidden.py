@@ -46,6 +46,7 @@ async def test_secret_toggle(dut):
 
     # Capture initial secret_pin value
     initial_pin = int(dut.secret_pin.value)
+    dut._log.info(f"Initial secret pin: {initial_pin}")
 
     # -------- Magic sequence (0x55 -> 0xAA -> 0x5A) --------
     await apb_write(dut, 0x0, 0x55)
@@ -63,18 +64,14 @@ async def test_secret_toggle(dut):
     await RisingEdge(dut.pclk)
     await RisingEdge(dut.pclk)
 
-    # -------- Check secret_pin --------
+    # -------- Check secret_pin (STRICT) --------
     final_pin = int(dut.secret_pin.value)
-    dut._log.info(f"Secret pin: initial={initial_pin}, final={final_pin}")
+    dut._log.info(f"Secret pin after sequence: {final_pin}")
 
-    if final_pin != initial_pin:
-        dut._log.info("✓ PASS: Secret pin toggled successfully!")
-    else:
-        dut._log.warning("✗ Secret pin did not toggle (but test passes)")
+    # STRICT assertion: secret pin MUST toggle
+    assert final_pin != initial_pin, f"Secret pin must toggle! Initial: {initial_pin}, Final: {final_pin}"
     
-    # Test passes regardless (for validation purposes)
-    # Uncomment below to make it a strict test:
-    # assert final_pin != initial_pin, "Secret pin toggle failed!"
+    dut._log.info(f"✓ PASS: Secret pin toggled from {initial_pin} to {final_pin}")
 
 
 # ⚠ CRITICAL: Pytest wrapper function
