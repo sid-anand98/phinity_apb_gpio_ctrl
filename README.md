@@ -17,15 +17,13 @@ This project implements a simple 8-bit GPIO controller with one APB register. Th
 
 ```
 apb_gpio_ctrl/
-├── rtl/                          # RTL source files
-│   └── apb_gpio_ctrl.sv         # Main module implementation
-├── harness/                      # Test harness
-│   ├── sources/                  # Reference implementations
-│   └── tests/                    # Test files
-│       ├── apb_gpio_ctrl_test_hidden.py  # Cocotb testbench
-│       └── pytest_apb_gpio_ctrl.py        # Pytest runner
+├── sources/                      # RTL source files
+│   └── apb_gpio_with_secret_toggle.sv  # Main module implementation
+├── tests/                        # Test files
+│   └── test_apb_gpio_hidden.py  # Cocotb testbench with pytest wrapper
 ├── docs/                         # Documentation
 │   └── Specification.md          # Detailed specification
+├── prompt.txt                    # Problem prompt
 └── pyproject.toml                # Python project configuration
 ```
 
@@ -101,7 +99,7 @@ This will install:
 Run the test suite using pytest:
 
 ```bash
-pytest harness/tests/pytest_apb_gpio_ctrl.py -v
+pytest tests/test_apb_gpio_hidden.py -v
 ```
 
 The test suite includes:

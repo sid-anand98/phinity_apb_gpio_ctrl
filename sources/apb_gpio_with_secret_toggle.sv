@@ -63,4 +63,3 @@ module apb_gpio_with_secret_toggle (
         end
     end
 endmodule
-
