@@ -67,9 +67,7 @@ async def test_secret_toggle(dut):
             return  # PASS
 
     # FAIL if it never toggled
-    raise cocotb.result.TestFailure(
-        "secret_pin never toggled — magic sequence not detected"
-    )
+    assert False, "secret_pin never toggled — magic sequence not detected"
 
 
 # ✅ CRITICAL: Pytest wrapper function
