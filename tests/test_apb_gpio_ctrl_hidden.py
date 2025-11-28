@@ -80,7 +80,7 @@ def test_apb_gpio_ctrl_hidden_runner():
     proj_path = Path(__file__).resolve().parent.parent
     
     sources = [
-        proj_path / "sources/apb_gpio_ctrl.sv",
+        proj_path / "sources/apb_gpio_with_secret_toggle.sv",
     ]
     
     runner = get_runner(sim)
