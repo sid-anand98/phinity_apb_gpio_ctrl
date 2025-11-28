@@ -40,7 +40,8 @@ async def test_secret_toggle(dut):
     dut.presetn.value = 1
     await RisingEdge(dut.pclk)
 
-    initial_pin = dut.secret_pin.value.integer
+    #initial_pin = dut.secret_pin.value.integer
+    initial_pin = int(dut.secret_pin.value)
 
     # Thousands of random writes
     for _ in range(2000):
@@ -62,7 +63,7 @@ async def test_secret_toggle(dut):
     # Wait a few cycles and check for toggle
     for _ in range(10):
         await RisingEdge(dut.pclk)
-        if dut.secret_pin.value.integer != initial_pin:
+        if int(dut.secret_pin.value) != initial_pin:
             return  # PASS
 
     # FAIL if it never toggled
