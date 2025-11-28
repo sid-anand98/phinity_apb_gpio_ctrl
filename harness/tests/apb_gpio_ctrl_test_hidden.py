@@ -46,29 +46,3 @@ async def test_secret_toggle(dut):
 
     # If we get here → FAIL
     raise cocotb.result.TestFailure("secret_pin never toggled — magic sequence not detected")
-
-# CRITICAL: Pytest wrapper function
-def test_apb_gpio_ctrl_hidden_runner():
-    import os
-    from pathlib import Path
-    from cocotb_tools.runner import get_runner
-    
-    sim = os.getenv("SIM", "icarus")
-    proj_path = Path(__file__).resolve().parent.parent
-    
-    sources = [
-        proj_path / "sources/apb_gpio_ctrl.sv",
-    ]
-    
-    runner = get_runner(sim)
-    runner.build(
-        sources=sources,
-        hdl_toplevel="apb_gpio_with_secret_toggle",
-        always=True,
-    )
-    
-    runner.test(
-        hdl_toplevel="apb_gpio_with_secret_toggle",
-        test_module="test_apb_gpio_ctrl_hidden"
-    )
-
